@@ -1,0 +1,15 @@
+version: "2"
+linters:
+  default: standard
+  enable:
+    - gosec
+    - gocognit
+    - errcheck
+    - staticcheck
+  settings:
+    gocognit:
+      min-complexity: 20
+    gosec:
+      # Opening the files named on the command line is the program's purpose.
+      excludes:
+        - G304
