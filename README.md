@@ -97,14 +97,22 @@ form has been checked against `file`.
 `make test` runs the CLI over the library's corpus (`testdata/corpus` of
 `github.com/eitanity/softmagic`, cloned beside this checkout as `../softmagic`; without it
 those tests skip), four modes per file against expectations produced by the reference, and over a
-temporary tree of special files whose expected answers were transcribed from the
-reference. To compare against a reference binary directly:
+temporary tree of special files whose expected answers were transcribed from the reference.
+
+Those expectations are stored. To compare against the reference itself:
 
 ```
-file -m /path/to/Magdir -i *.testfile > a
-softmagic -i *.testfile > b
-cmp a b
+make compare DIRS=/usr/bin:/etc:/dev
 ```
+
+`make reference` (which `compare` runs first) downloads file 5.48's release tarball, checks
+it against a pinned SHA-256, and builds it statically into `.reference/`, with the database
+compiled from that release's Magdir. `make compare` then runs `softmagic` and that binary side
+by side over the corpus and every path under `DIRS`, in ten output modes (default, `-b`, `-i`,
+`--mime-type`, `--mime-encoding`, `--extension`, `--apple`, `-L`, `-N`, `-E`). It requires
+stdout, stderr and the exit code to be byte-identical, and lists every difference. Building the
+reference needs a C compiler and `make`. A host's own `file` is not a substitute: it is usually
+another release.
 
 ## Licence
 

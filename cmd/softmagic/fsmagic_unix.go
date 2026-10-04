@@ -6,7 +6,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"syscall"
@@ -45,4 +47,35 @@ func unreadableInfo(name string, m fs.FileMode) string {
 // so a fifo with no writer reads as empty instead of waiting.
 func openForRead(name string) (*os.File, error) {
 	return os.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+}
+
+// readOnce is one read(2), as the reference makes it. The descriptor was
+// opened non-blocking, and os.File.Read would hand EAGAIN to the runtime
+// poller and wait for data, forever for a terminal nobody types into,
+// where the reference gets the error back at once and reports it. EINTR
+// is retried, as the runtime's own reads do.
+func readOnce(f *os.File, buf []byte) (int, error) {
+	rc, err := f.SyscallConn()
+	if err != nil {
+		return f.Read(buf)
+	}
+	n := 0
+	var rerr error
+	cerr := rc.Read(func(fd uintptr) bool {
+		for {
+			n, rerr = syscall.Read(int(fd), buf)
+			if !errors.Is(rerr, syscall.EINTR) {
+				return true
+			}
+		}
+	})
+	switch {
+	case cerr != nil:
+		return 0, cerr
+	case rerr != nil:
+		return 0, rerr
+	case n == 0 && len(buf) > 0:
+		return 0, io.EOF
+	}
+	return n, nil
 }

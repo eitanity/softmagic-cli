@@ -13,3 +13,12 @@ linters:
       # Opening the files named on the command line is the program's purpose.
       excludes:
         - G304
+  exclusions:
+    rules:
+      # The differential test runs the reference file(1) that make reference
+      # built, or the one SOFTMAGIC_REFERENCE names, over the paths the
+      # operator lists in SOFTMAGIC_REFERENCE_DIRS. Running that binary on
+      # those paths is the test; nothing else in the module does either.
+      - path: 'cmd/softmagic/reference_test\.go'
+        text: 'G204|G703'
+        linters: [gosec]

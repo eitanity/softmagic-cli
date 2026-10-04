@@ -31,3 +31,7 @@ func unreadableInfo(name string, m fs.FileMode) string {
 func openForRead(name string) (*os.File, error) {
 	return os.OpenFile(name, os.O_RDONLY, 0)
 }
+
+// readOnce is one read. Windows has no non-blocking open, so there is no
+// EAGAIN to preserve.
+func readOnce(f *os.File, buf []byte) (int, error) { return f.Read(buf) }

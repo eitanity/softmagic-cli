@@ -214,7 +214,7 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
 		r := d.db.IdentifyAt(context.Background(), f, info.Size(), opts)
 		return d.render(name, prefix, r), true
 	}
-	n, err := f.Read(d.buf)
+	n, err := readOnce(f, d.buf)
 	if err != nil && err != io.EOF {
 		if name == "" {
 			name = "/dev/stdin"
@@ -230,7 +230,7 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
 func readPipe(f *os.File, buf []byte) int {
 	n := 0
 	for n < len(buf) {
-		r, err := f.Read(buf[n:])
+		r, err := readOnce(f, buf[n:])
 		if r > 0 {
 			n += r
 		}
