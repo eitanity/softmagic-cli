@@ -174,7 +174,8 @@ func TestOptions(t *testing.T) {
 		}
 	}
 	out, _, code = capture(t, "", "--version")
-	if code != 0 || !strings.Contains(out, "implements file 5.48") {
+	if code != 0 || !strings.HasPrefix(out, "softmagic-cli ") || !strings.Contains(out, "\nlibrary ") ||
+		!strings.Contains(out, "implements file 5.48") {
 		t.Fatalf("--version: %q", out)
 	}
 	d := t.TempDir()

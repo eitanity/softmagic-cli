@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/eitanity/softmagic"
 	"github.com/eitanity/softmagic/compile"
 )
-
-const version = "0.1.0"
 
 // loadDatabase is file(1)'s magic selection: -m replaces the default
 // database with the colon-separated directories, each its own sorted map
@@ -67,5 +66,32 @@ func printVersion(w io.Writer) {
 	if db, err := softmagic.Default(); err == nil {
 		hash = db.Hash()
 	}
-	_, _ = fmt.Fprintf(w, "softmagic-cli %s\nimplements file %s\nmagic database %s\n", version, softmagic.ImplementsFile, hash)
+	cli, lib := buildVersions()
+	_, _ = fmt.Fprintf(w, "softmagic-cli %s\nlibrary %s\nimplements file %s\nmagic database %s\n",
+		cli, lib, softmagic.ImplementsFile, hash)
+}
+
+// buildVersions are this module's version and the softmagic library's, as
+// the go command recorded them in the binary: the tag for go install
+// …@v0.1.2, a pseudo-version for an untagged commit, the checkout's VCS
+// version (with +dirty for local changes) for go build, "(devel)" when
+// none is known. Nothing here is kept in step with a tag by hand.
+func buildVersions() (cli, lib string) {
+	cli, lib = "(unknown)", "(unknown)"
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return cli, lib
+	}
+	if bi.Main.Version != "" {
+		cli = bi.Main.Version
+	}
+	for _, dep := range bi.Deps {
+		if dep.Path == "github.com/eitanity/softmagic" {
+			lib = dep.Version
+			if dep.Replace != nil {
+				lib += " => " + dep.Replace.Path + " " + dep.Replace.Version
+			}
+		}
+	}
+	return cli, lib
 }
