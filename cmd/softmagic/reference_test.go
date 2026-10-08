@@ -18,7 +18,8 @@ import (
 
 // referenceModes are the output modes compared against the reference. Each
 // runs over every file, with names, so the stat layer and the column padding
-// are compared along with the answers.
+// are compared along with the answers. The -k modes list every match, and the
+// last two are the flags azul passes to libmagic for its two decoders.
 var referenceModes = [][]string{
 	{},
 	{"-b"},
@@ -30,6 +31,15 @@ var referenceModes = [][]string{
 	{"-L"},
 	{"-N"},
 	{"-E"},
+	{"-r"},
+	{"-k"},
+	{"-k", "-i"},
+	{"-k", "--mime-type"},
+	{"-k", "--mime-encoding"},
+	{"-k", "--extension"},
+	{"-k", "--apple"},
+	{"-k", "-r", "-E"},
+	{"-k", "-r", "-E", "--mime-type"},
 }
 
 // referenceBatch is how many files go to one invocation. The padding of the
@@ -56,23 +66,27 @@ func TestReference(t *testing.T) {
 	if len(files) == 0 {
 		t.Skip("no inputs: neither the library corpus nor SOFTMAGIC_REFERENCE_DIRS")
 	}
-	var diffs []string
-	compared := 0
+	t.Logf("%d files, each in %d modes", len(files), len(referenceModes))
 	for _, mode := range referenceModes {
-		for start := 0; start < len(files); start += referenceBatch {
-			batch := files[start:min(start+referenceBatch, len(files))]
-			diffs = append(diffs, compareBatch(t, ref, mode, batch)...)
-			compared += len(batch)
-		}
-	}
-	t.Logf("%d files in %d modes, %d comparisons; %d differences",
-		len(files), len(referenceModes), compared, len(diffs))
-	for i, d := range diffs {
-		if i == maxReported {
-			t.Errorf("... and %d more", len(diffs)-maxReported)
-			break
-		}
-		t.Error(d)
+		// One subtest per mode, named by its flags, so a run can select
+		// modes: go test -run 'TestReference/-k'.
+		t.Run("["+strings.Join(mode, " ")+"]", func(t *testing.T) {
+			var diffs []string
+			for start := 0; start < len(files); start += referenceBatch {
+				batch := files[start:min(start+referenceBatch, len(files))]
+				diffs = append(diffs, compareBatch(t, ref, mode, batch)...)
+			}
+			for i, d := range diffs {
+				if i == maxReported {
+					t.Errorf("... and %d more", len(diffs)-maxReported)
+					break
+				}
+				t.Error(d)
+			}
+			if len(diffs) > 0 {
+				t.Logf("%d differences", len(diffs))
+			}
+		})
 	}
 }
 

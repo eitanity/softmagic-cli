@@ -39,6 +39,7 @@ type options struct {
 	followLinks bool   // -L (default off: -h)
 	devices     bool   // -s
 	raw         bool   // -r
+	keepGoing   bool   // -k: every match, libmagic's MAGIC_CONTINUE
 	magicDirs   string // -m
 	extraDirs   string // --extra-magic
 	maxBytes    int    // --max-bytes / -P bytes=
@@ -47,7 +48,7 @@ type options struct {
 	help        bool
 }
 
-const usageText = `Usage: softmagic [-bEhiLnNrs0] [--apple] [--extension] [--mime-encoding]
+const usageText = `Usage: softmagic [-bEhikLnNrs0] [--apple] [--extension] [--mime-encoding]
                  [--mime-type] [--json] [-F <separator>] [-m <magicdirs>]
                  [--extra-magic <dirs>] [--max-bytes <n>] [-P bytes=<n>]
                  [-f <namefile>] <file> ...
@@ -63,7 +64,7 @@ func parseArgs(args []string) (options, []string, error) {
 	var o options
 	fs := flag.NewFlagSet("softmagic", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	var mime, mimeType, mimeEncoding, extension, apple, jsonOut, keepGoing, uncompress bool
+	var mime, mimeType, mimeEncoding, extension, apple, jsonOut, uncompress bool
 	var param string
 	fs.BoolVar(&o.brief, "b", false, "")
 	fs.BoolVar(&mime, "i", false, "")
@@ -81,7 +82,7 @@ func parseArgs(args []string) (options, []string, error) {
 	fs.BoolVar(&noFollow, "h", false, "")
 	fs.BoolVar(&o.devices, "s", false, "")
 	fs.BoolVar(&o.raw, "r", false, "")
-	fs.BoolVar(&keepGoing, "k", false, "")
+	fs.BoolVar(&o.keepGoing, "k", false, "")
 	fs.BoolVar(&uncompress, "z", false, "")
 	fs.StringVar(&o.separator, "F", ":", "")
 	fs.StringVar(&o.magicDirs, "m", "", "")
@@ -98,10 +99,7 @@ func parseArgs(args []string) (options, []string, error) {
 	if err := fs.Parse(args); err != nil {
 		return o, nil, fmt.Errorf("softmagic: %v\n%s", err, usageText)
 	}
-	switch {
-	case keepGoing:
-		return o, nil, errors.New("softmagic: -k (keep going) is not supported")
-	case uncompress:
+	if uncompress {
 		return o, nil, errors.New("softmagic: -z (look inside compressed files) is not supported: it is a non-goal of the library")
 	}
 	o.mode = selectMode(mime, mimeType, mimeEncoding, extension, apple, jsonOut)

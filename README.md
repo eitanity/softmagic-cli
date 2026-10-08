@@ -16,7 +16,7 @@ The binary is called `softmagic`. It is built against the tagged library,
 ## Usage
 
 ```
-softmagic [-bEhiLnNrs0] [--apple] [--extension] [--mime-encoding] [--mime-type]
+softmagic [-bEhikLnNrs0] [--apple] [--extension] [--mime-encoding] [--mime-type]
           [--json] [-F <separator>] [-m <magicdirs>] [--extra-magic <dirs>]
           [--max-bytes <n>] [-P bytes=<n>] [-f <namefile>] <file> ...
 softmagic --version
@@ -38,22 +38,22 @@ softmagic --version
 | `-h` / `-L` | do not / do follow symbolic links (default: do not) |
 | `-s` | read block and character devices, and empty regular files, instead of describing the inode |
 | `-r` | raw: no octal escaping of unprintable characters in names and answers |
+| `-k` | keep going: every match, each after a `\012- ` separator (a newline with `-r`), in any of the output modes above |
 | `-f file` | file names one per line from `file`, `-` for standard input, printed before any names on the command line |
 | `-m dirs` | replace the embedded database with the magic source in these colon-separated directories |
 | `--extra-magic dirs` | append magic source directories to whichever database is in use |
 | `--max-bytes n`, `-P bytes=n` | consult at most `n` bytes of each file (default 7 MiB, as `file`) |
 | `-` | standard input, named `/dev/stdin` |
 
-`-k` (keep going) and `-z` (look inside compressed files) are refused: the
-first is not in the library and the second is a non-goal of it. The other `-P`
-parameters are limits the library fixes.
+`-z` (look inside compressed files) is refused: it is a non-goal of the
+library. The other `-P` parameters are limits the library fixes.
 
 ## What is identical
 
 Over the library's parity corpus and a set of special files, the output of
 `softmagic` and of the reference `file -m Magdir` built from the 5.48 tarball
 is byte-identical, exit code included, for every mode listed above and their
-combinations with `-b`, `-N`, `-0`, `-00`, `-F`, `-n`, `-r`, `-s`, `-L`, `-E`,
+combinations with `-k`, `-b`, `-N`, `-0`, `-00`, `-F`, `-n`, `-r`, `-s`, `-L`, `-E`,
 `-f` and standard input. That covers:
 
 - the stat layer from `fsmagic.c`: directories, symbolic links (followed only
@@ -79,7 +79,7 @@ Known differences:
 - `--version` and the usage text are this program's own.
 - `-m` and `--extra-magic` take source directories, not compiled `.mgc` files.
 - A name holding an East Asian wide character pads one column short of `file`.
-- `file`'s `-C`, `-c`, `-d`, `-e`, `-l`, `-p`, `-S`, `-z`, `-Z`, `-k` and
+- `file`'s `-C`, `-c`, `-d`, `-e`, `-l`, `-p`, `-S`, `-z`, `-Z` and
   `--exclude-quiet` are not provided.
 
 ## Platforms
@@ -108,8 +108,11 @@ make compare DIRS=/usr/bin:/etc:/dev
 `make reference` (which `compare` runs first) downloads file 5.48's release tarball, checks
 it against a pinned SHA-256, and builds it statically into `.reference/`, with the database
 compiled from that release's Magdir. `make compare` then runs `softmagic` and that binary side
-by side over the corpus and every path under `DIRS`, in ten output modes (default, `-b`, `-i`,
-`--mime-type`, `--mime-encoding`, `--extension`, `--apple`, `-L`, `-N`, `-E`). It requires
+by side over the corpus and every path under `DIRS`, in nineteen output modes: default, `-b`,
+`-i`, `--mime-type`, `--mime-encoding`, `--extension`, `--apple`, `-L`, `-N`, `-E`, `-r`, `-k`
+with each of the five output modes, and `-k -r -E` with and without `--mime-type` (the flags
+azul passes to libmagic). Each mode is a subtest, so `go test -run 'TestReference/-k'` selects
+some. It requires
 stdout, stderr and the exit code to be byte-identical, and lists every difference. Building the
 reference needs a C compiler and `make`. A host's own `file` is not a substitute: it is usually
 another release.

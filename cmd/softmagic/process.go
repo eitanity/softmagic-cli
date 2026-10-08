@@ -198,7 +198,7 @@ func escapeOutput(text string) string {
 func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
 	info, serr := f.Stat()
 	okstat := serr == nil
-	opts := softmagic.Options{MaxBytes: d.o.maxBytes}
+	opts := softmagic.Options{MaxBytes: d.o.maxBytes, Continue: d.o.keepGoing, Raw: d.o.raw}
 	if okstat {
 		opts.Executable = info.Mode()&0o111 != 0
 	}
@@ -246,6 +246,9 @@ func readPipe(f *os.File, buf []byte) int {
 // printed and puts ", " before its own description unless a text rule
 // printed something; that quirk is reproduced.
 func (d *driver) render(name, prefix string, r softmagic.Result) string {
+	if d.o.keepGoing && d.o.mode != modeJSON {
+		return d.renderContinued(prefix, r)
+	}
 	switch d.o.mode {
 	case modeMime:
 		return r.MIME + "; charset=" + r.Charset
@@ -272,6 +275,36 @@ func (d *driver) render(name, prefix string, r softmagic.Result) string {
 		return prefix + r.Description
 	}
 }
+
+// renderContinued is render under -k: each mode's list joined with the
+// reference's separator, which the output escaping later shows as \012-
+// unless -r is given.
+func (d *driver) renderContinued(prefix string, r softmagic.Result) string {
+	c := r.Continued
+	switch d.o.mode {
+	case modeMime:
+		return joinAnswers(c.MIMEs) + "; charset=" + r.Charset
+	case modeMimeType:
+		return joinAnswers(c.MIMEs)
+	case modeMimeEncoding:
+		return joinAnswers(c.Encodings)
+	case modeExtension:
+		return joinAnswers(c.Extensions)
+	case modeApple:
+		return joinAnswers(c.Apple)
+	default:
+		// As without -k: when the text phase answered first with no rule,
+		// nothing preceded it, and the stat layer's words are joined to it.
+		if prefix != "" && r.Phase == softmagic.PhaseText && len(r.Rules) == 0 {
+			return prefix + ", " + joinAnswers(c.Descriptions)
+		}
+		return prefix + joinAnswers(c.Descriptions)
+	}
+}
+
+// joinAnswers is the reference's -k output: answers separated by
+// FILE_SEPARATOR.
+func joinAnswers(a []string) string { return strings.Join(a, "\n- ") }
 
 // jsonLine is the --json record: the name, the stat layer's mode words
 // and the library's Result.
