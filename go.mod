@@ -2,7 +2,7 @@ module github.com/eitanity/softmagic-cli
 
 go 1.26.0
 
-require github.com/eitanity/softmagic v0.3.0
+require github.com/eitanity/softmagic v0.3.1
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.4.0 // indirect
