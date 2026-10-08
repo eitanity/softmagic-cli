@@ -18,7 +18,7 @@ import (
 // errors as Unix spells them. None of these can be made, or reads the same,
 // on Windows, whose stat layer has not been compared with a reference.
 func TestSpecialFiles(t *testing.T) {
-	d := t.TempDir()
+	d := t.TempDir() // tempDir
 	must := func(err error) {
 		t.Helper()
 		if err != nil {
@@ -48,7 +48,7 @@ func TestSpecialFiles(t *testing.T) {
 		{nil, "fifo", "fifo (named pipe)", 0},
 		{nil, "missing", "cannot open `" + filepath.Join(d, "missing") + "' (No such file or directory)", 0},
 		{nil, "sg.txt", "setgid , ASCII text, with no line terminators", 0},
-		{nil, "tablink", "symbolic link to " + strings.ReplaceAll(filepath.Join(d, "tab\\011name"), "\\011", "\\011"), 0},
+		{nil, "tablink", "symbolic link to " + filepath.Join(d, "tab\\011name"), 0},
 		{[]string{"-r"}, "tablink", "symbolic link to " + filepath.Join(d, "tab\tname"), 0},
 		{[]string{"-L"}, "link", "ASCII text", 0},
 		{[]string{"-L"}, "dangling", "cannot open `" + filepath.Join(d, "dangling") + "' (No such file or directory)", 0},

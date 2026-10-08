@@ -23,9 +23,9 @@ func main() {
 
 // run is main without the process: it returns the exit code.
 func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
-	_, posixly := os.LookupEnv("POSIXLY_CORRECT") // set at all counts, as getenv sees it
-	p := parsePlan(args, posixly)
-	db, status, ok := runLists(p, stdin, stdout, stderr)
+	_, posixly := os.LookupEnv("POSIXLY_CORRECT")        // set at all counts, as getenv sees it
+	p := parsePlan(args, posixly)                        // plan
+	db, status, ok := runLists(p, stdin, stdout, stderr) // listsOK
 	if !ok {
 		return 1
 	}
@@ -67,7 +67,7 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 // when there was no list), the exit status so far, and false when the
 // command cannot go on.
 func runLists(p plan, stdin *os.File, stdout, stderr *os.File) (*softmagic.Database, int, bool) {
-	var db *softmagic.Database
+	var db *softmagic.Database // database
 	status := 0
 	for _, job := range p.lists {
 		if db == nil {
@@ -93,7 +93,7 @@ func runLists(p plan, stdin *os.File, stdout, stderr *os.File) (*softmagic.Datab
 
 // stopEarly is what ends the command after the options: --version or
 // --help where they appeared, an option that ends it, or usage errors.
-func stopEarly(p plan, stdout, stderr *os.File) (int, bool) {
+func stopEarly(p plan, stdout, stderr *os.File) (int, bool) { // plan
 	switch {
 	case p.stop == "version":
 		printVersion(stdout)

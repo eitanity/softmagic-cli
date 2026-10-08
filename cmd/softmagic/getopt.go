@@ -69,8 +69,8 @@ type optEvent struct {
 // posixly (POSIXLY_CORRECT), when the first name ends the options; "--"
 // ends them too. Errors are getopt's messages, in order.
 func getoptLong(args []string, posixly bool) (events []optEvent, names, errs []string) {
-	for i := 0; i < len(args); i++ {
-		a := args[i]
+	for i := 0; i < len(args); i++ { // argIndex
+		a := args[i] // arg
 		switch {
 		case a == "--":
 			return events, append(names, args[i+1:]...), errs
@@ -80,7 +80,7 @@ func getoptLong(args []string, posixly bool) (events []optEvent, names, errs []s
 			}
 			names = append(names, a)
 		case strings.HasPrefix(a, "--"):
-			ev, used, err := longOption(a[2:], args[i+1:])
+			ev, used, err := longOption(a[2:], args[i+1:]) // event
 			i += used
 			if err != "" {
 				errs = append(errs, err)
@@ -154,7 +154,7 @@ func lookupLong(name string) (*optSpec, string) {
 func shortOptions(cluster string, rest []string) ([]optEvent, int, []string) {
 	var events []optEvent
 	var errs []string
-	for j := 0; j < len(cluster); j++ {
+	for j := 0; j < len(cluster); j++ { // clusterIndex
 		spec := lookupShort(cluster[j])
 		switch {
 		case spec == nil:

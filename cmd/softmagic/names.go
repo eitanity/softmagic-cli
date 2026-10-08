@@ -21,9 +21,9 @@ func nameText(name string, raw bool) string {
 	if raw {
 		return name
 	}
-	var b strings.Builder
-	for i := 0; i < len(name); {
-		r, size := utf8.DecodeRuneInString(name[i:])
+	var b strings.Builder        // escaped
+	for i := 0; i < len(name); { // byteIndex
+		r, size := utf8.DecodeRuneInString(name[i:]) // char
 		switch {
 		case r == utf8.RuneError && size == 1:
 			fmt.Fprintf(&b, "\\%03o", name[i])
@@ -39,8 +39,8 @@ func nameText(name string, raw bool) string {
 
 // nameWidth is file_mbswidth: the columns the printed name occupies.
 func nameWidth(name string, raw bool) int {
-	w := 0
-	for i := 0; i < len(name); {
+	w := 0                       // width
+	for i := 0; i < len(name); { // byteIndex
 		r, size := utf8.DecodeRuneInString(name[i:])
 		switch {
 		case r == utf8.RuneError && size == 1:

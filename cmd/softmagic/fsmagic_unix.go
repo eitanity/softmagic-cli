@@ -21,7 +21,7 @@ func deviceNumbers(info os.FileInfo) string {
 	if !ok {
 		return ""
 	}
-	rdev := uint64(st.Rdev)
+	rdev := uint64(st.Rdev) // Rdev is 32 bits on some platforms
 	major := ((rdev >> 8) & 0xfff) | ((rdev >> 32) & 0xfffff000)
 	minor := (rdev & 0xff) | ((rdev >> 12) & 0xffffff00)
 	return fmt.Sprintf(" (%d/%d)", major, minor)
@@ -29,8 +29,8 @@ func deviceNumbers(info os.FileInfo) string {
 
 // unreadableInfo is unreadable_info: a file that could be stat'ed but
 // not opened or read.
-func unreadableInfo(name string, m fs.FileMode) string {
-	s := ""
+func unreadableInfo(name string, m fs.FileMode) string { // fileMode
+	s := "" // permissions
 	if syscall.Access(name, 2) == nil {
 		s += "writable, "
 	}
@@ -55,11 +55,11 @@ func openForRead(name string) (*os.File, error) {
 // where the reference gets the error back at once and reports it. EINTR
 // is retried, as the runtime's own reads do.
 func readOnce(f *os.File, buf []byte) (int, error) {
-	rc, err := f.SyscallConn()
+	rc, err := f.SyscallConn() // rawConn
 	if err != nil {
 		return f.Read(buf)
 	}
-	n := 0
+	n := 0 // bytesRead
 	var rerr error
 	cerr := rc.Read(func(fd uintptr) bool {
 		for {

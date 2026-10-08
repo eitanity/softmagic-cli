@@ -20,12 +20,14 @@ import (
 func TestOptionForms(t *testing.T) {
 	ref := referenceDir(t)
 	corpus := filepath.Join("..", "..", "..", "softmagic", "testdata", "corpus")
-	a, b := filepath.Join(corpus, "json1.testfile"), filepath.Join(corpus, "pnm1.testfile")
+	a, b := filepath.Join(corpus, "json1.testfile"), filepath.Join(corpus, "pnm1.testfile") // pnmFile
 	if _, err := os.Stat(a); err != nil {
 		t.Skip("library corpus not beside this checkout")
 	}
 	list := filepath.Join(t.TempDir(), "list")
 	writeFile(t, list, a+"\n")
+	odd := filepath.Join(t.TempDir(), "odd")
+	writeFile(t, odd, a+"\n\n"+b+"\r\nno-newline") // an empty name, a CR kept, a last line unended
 	link := filepath.Join(t.TempDir(), "link")
 	if err := os.Symlink(b, link); err != nil {
 		t.Skip("no symlinks here")
@@ -45,6 +47,8 @@ func TestOptionForms(t *testing.T) {
 		{"--ex", "json", a}, {"-e", "nosuch", a}, {"-P", "nosuch=1", a}, {"-P", "indir=99999", a},
 		{link}, // -z and the other refused non-goals are TestRefusedFlags' {"-L", link}, {"--dereference", link},
 		{"--no-dereference", "-L", link}, {"-L", "--no-dereference", link}, {}, {"-b"},
+		{"-f", odd}, {"-P", "regex=-9223372036854775809", a}, {"-P", "regex=-9223372036854775808", a},
+		{"-P", "regex=9223372036854775808", a}, {"-P", "regex=-4294967297", a},
 	}
 	for _, f := range forms {
 		compareForm(t, ref, f, "")

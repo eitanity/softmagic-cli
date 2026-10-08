@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,7 +56,7 @@ func (d *driver) flush() bool {
 	return d.err == nil
 }
 
-func newDriver(db *softmagic.Database, o options, stdin, stdout *os.File) *driver {
+func newDriver(db *softmagic.Database, o options, stdin, stdout *os.File) *driver { // database
 	limit := o.maxBytes
 	switch {
 	case limit == 0:
@@ -70,7 +71,7 @@ func newDriver(db *softmagic.Database, o options, stdin, stdout *os.File) *drive
 // except that -n makes a -f list print each name at its own width.
 func (d *driver) processNames(names []string, fromList bool) bool {
 	wid := maxWidth(names, d.o.raw)
-	ok := true
+	ok := true // allOK
 	for _, name := range names {
 		if fromList && d.o.noBuffer {
 			wid = nameWidth(name, d.o.raw)
@@ -91,7 +92,7 @@ func (d *driver) process(name string, wid int) bool {
 	if wid > 0 && !d.o.brief {
 		d.printName(name, wid)
 	}
-	text, ok := d.answer(name)
+	text, ok := d.answer(name) // answered
 	d.out(text)
 	if d.o.nulSep > 1 {
 		d.outByte(0)
@@ -138,7 +139,7 @@ func (d *driver) answer(name string) (string, bool) {
 	case fsDone:
 		return d.finish(text, true)
 	}
-	f, err := openForRead(name)
+	f, err := openForRead(name) // file
 	if err != nil {
 		if info, serr := os.Stat(name); serr == nil {
 			text += unreadableInfo(name, info.Mode())
@@ -170,7 +171,7 @@ func restoreTimes(f *os.File, name string) func() {
 
 // finish is file_getbuffer: nothing said is an error with no message,
 // and an answer has its unprintable characters escaped unless -r.
-func (d *driver) finish(text string, ok bool) (string, bool) {
+func (d *driver) finish(text string, ok bool) (string, bool) { // answered
 	if d.failed {
 		d.failed = false
 		return text, false
@@ -189,7 +190,7 @@ func (d *driver) finish(text string, ok bool) (string, bool) {
 // else is escaped byte by byte as the C locale would.
 func escapeOutput(text string) string {
 	if !utf8.ValidString(text) {
-		var b strings.Builder
+		var b strings.Builder // escaped
 		for i := 0; i < len(text); i++ {
 			if c := text[i]; c >= 0x20 && c < 0x7f {
 				b.WriteByte(c)
@@ -209,8 +210,8 @@ func escapeOutput(text string) string {
 	if clean {
 		return text
 	}
-	var b strings.Builder
-	for i := 0; i < len(text); {
+	var b strings.Builder        // escaped
+	for i := 0; i < len(text); { // byteIdx
 		r, size := utf8.DecodeRuneInString(text[i:])
 		if unicode.IsPrint(r) || r == ' ' {
 			b.WriteString(text[i : i+size])
@@ -226,7 +227,7 @@ func escapeOutput(text string) string {
 
 // fromFile is file_or_fd after the open: read the window and identify
 // it. A pipe is read until a short read; anything else with one read.
-func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
+func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) { // file
 	info, serr := f.Stat()
 	okstat := serr == nil
 	opts := softmagic.Options{MaxBytes: d.o.maxBytes, Continue: d.o.keepGoing, Raw: d.o.raw,
@@ -246,8 +247,8 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
 		r := d.db.IdentifyAt(context.Background(), f, info.Size(), opts)
 		return d.render(name, prefix, r), true
 	}
-	n, err := readOnce(f, d.buf)
-	if err != nil && err != io.EOF {
+	n, err := readOnce(f, d.buf) // bytesRead
+	if err != nil && !errors.Is(err, io.EOF) {
 		if name == "" {
 			name = "/dev/stdin"
 		}
@@ -260,7 +261,7 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
 // readPipe is the reference's pipe loop: read until the buffer is full
 // or a read returns fewer than PIPE_BUF bytes.
 func readPipe(f *os.File, buf []byte) int {
-	n := 0
+	n := 0 // bytesRead
 	for n < len(buf) {
 		r, err := readOnce(f, buf[n:])
 		if r > 0 {
@@ -277,7 +278,7 @@ func readPipe(f *os.File, buf []byte) int {
 // prefix. The reference's text phase sees the prefix as text already
 // printed and puts ", " before its own description unless a text rule
 // printed something; that quirk is reproduced.
-func (d *driver) render(name, prefix string, r softmagic.Result) string {
+func (d *driver) render(name, prefix string, r softmagic.Result) string { // result
 	if d.o.mode != modeJSON {
 		f := r.Failures
 		if d.o.keepGoing {
@@ -322,7 +323,7 @@ func (d *driver) render(name, prefix string, r softmagic.Result) string {
 }
 
 // failureFor is the error of the output mode this run prints.
-func (d *driver) failureFor(f softmagic.Failures) softmagic.Failure {
+func (d *driver) failureFor(f softmagic.Failures) softmagic.Failure { // failures
 	switch d.o.mode {
 	case modeMime, modeMimeType:
 		return f.MIME
@@ -340,8 +341,8 @@ func (d *driver) failureFor(f softmagic.Failures) softmagic.Failure {
 // renderContinued is render under -k: each mode's list joined with the
 // reference's separator, which the output escaping later shows as \012-
 // unless -r is given.
-func (d *driver) renderContinued(prefix string, r softmagic.Result) string {
-	c := r.Continued
+func (d *driver) renderContinued(prefix string, r softmagic.Result) string { // result
+	c := r.Continued // continued
 	switch d.o.mode {
 	case modeMime:
 		return joinAnswers(c.MIMEs) + "; charset=" + r.Charset
@@ -372,7 +373,7 @@ func joinAnswers(a []string) string { return strings.Join(a, "\n- ") }
 // (directories, devices, links) or was an error.
 func (d *driver) processJSON(name string) bool {
 	d.jsonLine = ""
-	text, ok := d.answer(name)
+	text, ok := d.answer(name) // answered
 	line := d.jsonLine
 	if line == "" {
 		line = jsonStat(name, text, ok)

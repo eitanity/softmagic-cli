@@ -22,7 +22,7 @@ import (
 // Windows it shows up as a file that cannot be deleted. /proc/self/fd makes
 // it countable here.
 func TestNoDescriptorLeaks(t *testing.T) {
-	d := t.TempDir()
+	d := t.TempDir() // tempDir
 	text := filepath.Join(d, "note.txt")
 	writeFile(t, text, "hello\n")
 	empty := filepath.Join(d, "empty")

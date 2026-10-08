@@ -141,8 +141,8 @@ func parsePlan(args []string, posixly bool) plan {
 	events, names, errs := getoptLong(args, posixly)
 	cur := options{separator: ":", followLinks: posixly}
 	var frozen *options
-	p := plan{errs: errs, names: names}
-	for _, ev := range events {
+	p := plan{errs: errs, names: names} // plan
+	for _, ev := range events {         // event
 		switch ev.spec.long {
 		case "files-from":
 			if frozen == nil {
@@ -176,7 +176,7 @@ func parsePlan(args []string, posixly bool) plan {
 // loaded the database (lib). A list read at its -f also sees the -b count
 // as it stands then, before the end-of-options rule for -b given twice.
 func withLibFlags(cur, lib options, atList bool) options {
-	o := cur
+	o := cur // merged
 	o.mime, o.mimeType, o.mimeEncoding = lib.mime, lib.mimeType, lib.mimeEncoding
 	o.extension, o.apple, o.jsonOut = lib.extension, lib.apple, lib.jsonOut
 	o.keepGoing, o.raw, o.exclude = lib.keepGoing, lib.raw, lib.exclude
@@ -190,7 +190,7 @@ func withLibFlags(cur, lib options, atList bool) options {
 
 // apply is one option, as file.c's switch takes it. It returns an error
 // message and whether it ends the command at once.
-func (o *options) apply(ev optEvent) (string, bool) {
+func (o *options) apply(ev optEvent) (string, bool) { // event
 	switch ev.spec.long {
 	case "magic-file":
 		o.magicDirs = ev.value
@@ -285,19 +285,6 @@ func (o *options) finish(names int) {
 	}
 }
 
-// parseArgs is parsePlan's final options, names and first error, for
-// callers that need no more (the tests of single options).
-func parseArgs(args []string) (options, []string, error) {
-	p := parsePlan(args, false)
-	switch {
-	case p.fatal != "":
-		return p.final, nil, errors.New(p.fatal)
-	case len(p.errs) > 0:
-		return p.final, nil, fmt.Errorf("softmagic: %s\n%s", p.errs[0], usageText)
-	}
-	return p.final, p.names, nil
-}
-
 // checkNames is file.c's nv[]: the names -e takes, in the reference's order.
 var checkNames = []struct {
 	name  string
@@ -369,14 +356,14 @@ var paramTable = []struct {
 // read as atoi reads it, and a value out of range, or no parameter, is an
 // error. The library takes 0 to mean its default, so a 0 from the command
 // line is passed as -1, which it takes as 0.
-func applyParams(o *options, params []string) error {
+func applyParams(o *options, params []string) error { // opts
 	for _, p := range params {
 		key, value, ok := strings.Cut(p, "=")
-		i := paramIndex(key)
+		i := paramIndex(key) // paramIdx
 		if !ok || i < 0 {
 			return fmt.Errorf("softmagic: Unknown param %s", p)
 		}
-		v, saturated := atoi(value)
+		v, saturated := atoi(value) // paramValue
 		if v < 0 || v > paramTable[i].max {
 			msg := fmt.Sprintf("softmagic: Out of bounds value %d for %s", v, paramTable[i].name)
 			if saturated {
@@ -401,8 +388,8 @@ func paramIndex(key string) int {
 	return -1
 }
 
-func setParam(o *options, name string, v int) {
-	l := &o.limits
+func setParam(o *options, name string, v int) { // paramValue
+	l := &o.limits // limits
 	switch name {
 	case "bytes":
 		o.maxBytes = v
@@ -430,36 +417,42 @@ func setParam(o *options, name string, v int) {
 // after them matters; no digits is 0. It is strtol cast to int, so a value
 // past the long range saturates first (and reports it, as strtol's ERANGE
 // does), and the cast keeps the low 32 bits.
-func atoi(s string) (int, bool) {
+func atoi(s string) (int, bool) { // numberText
 	s = strings.TrimLeft(s, " \t\n\v\f\r")
 	neg := false
 	if s != "" && (s[0] == '-' || s[0] == '+') {
 		neg = s[0] == '-'
 		s = s[1:]
 	}
-	var n int64
+	// The magnitude strtol allows: LONG_MAX, or one more for a negative.
+	limit := uint64(math.MaxInt64)
+	if neg {
+		limit++
+	}
+	var mag uint64
 	saturated := false
 	for i := 0; i < len(s) && s[i] >= '0' && s[i] <= '9'; i++ {
-		d := int64(s[i] - '0')
-		if n > (math.MaxInt64-d)/10 {
-			n, saturated = math.MaxInt64, true // strtol saturates
+		d := uint64(s[i] - '0')
+		if mag > (limit-d)/10 {
+			mag, saturated = limit, true // strtol saturates and sets ERANGE
 			break
 		}
-		n = n*10 + d
+		mag = mag*10 + d
 	}
+	low := mag & 0xffffffff // the int cast keeps the low 32 bits of the long
 	if neg {
-		n = -n
+		low = -low & 0xffffffff
 	}
-	low := n & 0xffffffff
-	if low >= 1<<31 {
-		low -= 1 << 32
+	v := int64(low)
+	if v >= 1<<31 {
+		v -= 1 << 32
 	}
-	return int(low), saturated
+	return int(v), saturated
 }
 
 // readNames is -f: one file name per line, "-" for standard input.
 func readNames(from string, stdin io.Reader) ([]string, error) {
-	r := stdin
+	r := stdin // listReader
 	if from != "-" {
 		f, err := os.Open(from) // the list file the user named; see the Makefile on G304
 		if err != nil {
@@ -468,12 +461,28 @@ func readNames(from string, stdin io.Reader) ([]string, error) {
 		defer func() { _ = f.Close() }()
 		r = f
 	}
+	return splitNames(bufio.NewReader(r))
+}
+
+// splitNames is unwrap's getline loop: a name per line, its newline
+// removed and nothing else (a carriage return stays, an empty line is an
+// empty name), any length, and, as the name is a C string, ending at a NUL.
+func splitNames(r *bufio.Reader) ([]string, error) {
 	var names []string
-	sc := bufio.NewScanner(r)
-	for sc.Scan() {
-		if line := sc.Text(); line != "" {
+	for {
+		line, err := r.ReadString('\n')
+		if line != "" {
+			line = strings.TrimSuffix(line, "\n")
+			if nul := strings.IndexByte(line, 0); nul >= 0 {
+				line = line[:nul]
+			}
 			names = append(names, line)
 		}
+		switch {
+		case errors.Is(err, io.EOF):
+			return names, nil
+		case err != nil:
+			return names, err
+		}
 	}
-	return names, sc.Err()
 }

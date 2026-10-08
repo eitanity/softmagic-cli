@@ -62,7 +62,7 @@ func isSilent(o options) bool { return o.mode == modeExtension || o.mode == mode
 
 // fsmagic is file_fsmagic for one name: the text so far and whether the
 // caller goes on to read the file.
-func fsmagic(o options, name string) (string, int) {
+func fsmagic(o options, name string) (string, int) { // opts
 	var info os.FileInfo
 	var err error
 	if o.followLinks {
@@ -76,7 +76,7 @@ func fsmagic(o options, name string) (string, int) {
 		}
 		return fmt.Sprintf("cannot open `%s' (%s)", name, cerror(err)), fsContinue
 	}
-	var b fsBuf
+	var b fsBuf // answerBuf
 	mime, silent := isMime(o), isSilent(o)
 	if !mime && !silent {
 		modePrefix(&b, info.Mode())
@@ -96,7 +96,7 @@ func fsmagic(o options, name string) (string, int) {
 }
 
 // modePrefix is the "setuid", "setgid", "sticky" list.
-func modePrefix(b *fsBuf, m fs.FileMode) {
+func modePrefix(b *fsBuf, m fs.FileMode) { // mode
 	if m&fs.ModeSetuid != 0 {
 		b.add("setuid")
 	}
@@ -109,7 +109,7 @@ func modePrefix(b *fsBuf, m fs.FileMode) {
 }
 
 // inode records one inode type in the mode's wording.
-func inode(o options, b *fsBuf, desc, what string) int {
+func inode(o options, b *fsBuf, desc, what string) int { // answerBuf
 	switch {
 	case isMime(o):
 		b.mime(o, what)
@@ -121,8 +121,8 @@ func inode(o options, b *fsBuf, desc, what string) int {
 }
 
 // typeAnswer is the switch on the file type.
-func typeAnswer(o options, name string, info os.FileInfo, b *fsBuf) int {
-	m := info.Mode()
+func typeAnswer(o options, name string, info os.FileInfo, b *fsBuf) int { // answerBuf
+	m := info.Mode() // mode
 	switch {
 	case m.IsDir():
 		return inode(o, b, "directory", "directory")
@@ -158,7 +158,7 @@ func typeAnswer(o options, name string, info os.FileInfo, b *fsBuf) int {
 
 // symlinkAnswer reports a symbolic link; the file is read through it
 // only in the silent modes, as the reference does.
-func symlinkAnswer(o options, name string, b *fsBuf) int {
+func symlinkAnswer(o options, name string, b *fsBuf) int { // opts
 	target, err := os.Readlink(name)
 	if err != nil {
 		if o.errExit {
@@ -175,7 +175,7 @@ func symlinkAnswer(o options, name string, b *fsBuf) int {
 
 // badLink is bad_link: a dangling symbolic link. Only the MIME type is
 // printed in the MIME modes, so --mime-encoding prints nothing.
-func badLink(o options, b *fsBuf, target string, err error) int {
+func badLink(o options, b *fsBuf, target string, err error) int { // answerBuf
 	switch {
 	case o.mode == modeMime || o.mode == modeMimeType:
 		b.text += "inode/symlink"

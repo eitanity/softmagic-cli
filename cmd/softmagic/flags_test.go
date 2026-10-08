@@ -5,6 +5,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +20,7 @@ import (
 // parameter it begins, the value is read as atoi reads it, and 0 reaches
 // the library as -1, which it takes as 0 rather than as its default.
 func TestParams(t *testing.T) {
-	for _, c := range []struct {
+	for _, c := range []struct { // testCase
 		args  []string
 		bytes int
 		lim   softmagic.Limits
@@ -40,7 +42,7 @@ func TestParams(t *testing.T) {
 		{args: []string{"-P", "foo=1"}, err: "Unknown param foo=1"},
 		{args: []string{"-P", "bytes"}, err: "Unknown param bytes"},
 	} {
-		o, _, err := parseArgs(append(c.args, "x"))
+		o, err := parseArgs(append(c.args, "x")) // parsedOptions
 		switch {
 		case c.err != "":
 			if err == nil || !strings.Contains(err.Error(), c.err) {
@@ -57,11 +59,11 @@ func TestParams(t *testing.T) {
 // TestExcludeFlags: -e takes file(1)'s names, an unknown one is a usage
 // error, and --exclude-quiet ignores what it does not know.
 func TestExcludeFlags(t *testing.T) {
-	o, _, err := parseArgs([]string{"-e", "soft", "-e", "ascii", "--exclude-quiet", "nosuch", "x"})
+	o, err := parseArgs([]string{"-e", "soft", "-e", "ascii", "--exclude-quiet", "nosuch", "x"})
 	if err != nil || o.exclude != softmagic.CheckSoft|softmagic.CheckText {
 		t.Fatalf("exclude %v, err %v", o.exclude, err)
 	}
-	if _, _, err := parseArgs([]string{"-e", "nosuch", "x"}); err == nil || !strings.Contains(err.Error(), "Usage:") {
+	if _, err := parseArgs([]string{"-e", "nosuch", "x"}); err == nil || !strings.Contains(err.Error(), "Usage:") {
 		t.Fatalf("-e nosuch: %v", err)
 	}
 }
@@ -101,7 +103,7 @@ func TestListAndCheck(t *testing.T) {
 // TestPreserveAtime: -p puts back the access time reading changed.
 func TestPreserveAtime(t *testing.T) {
 	d := t.TempDir()
-	f := filepath.Join(d, "txt")
+	f := filepath.Join(d, "txt") // textFile
 	writeFile(t, f, "hello\n")
 	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
 	if err := os.Chtimes(f, old, old); err != nil {
@@ -126,8 +128,8 @@ func TestPreserveAtime(t *testing.T) {
 // TestJSONEveryName: --json prints one JSON object per line and nothing
 // else, for library answers, stat-layer answers and errors alike.
 func TestJSONEveryName(t *testing.T) {
-	d := t.TempDir()
-	f := filepath.Join(d, "txt")
+	d := t.TempDir()             // tempDir
+	f := filepath.Join(d, "txt") // textFile
 	writeFile(t, f, "hello\n")
 	missing := filepath.Join(d, "missing")
 	out, _, _ := capture(t, "", "--json", f, d, missing)
@@ -150,4 +152,17 @@ func TestJSONEveryName(t *testing.T) {
 	if recs[2].Name != missing || !strings.Contains(recs[2].Answer+recs[2].Error, "No such file") {
 		t.Errorf("missing: %+v", recs[2])
 	}
+}
+
+// parseArgs is parsePlan's final options and first error, for the tests
+// of single options.
+func parseArgs(args []string) (options, error) {
+	p := parsePlan(args, false) // parsedPlan
+	switch {
+	case p.fatal != "":
+		return p.final, errors.New(p.fatal)
+	case len(p.errs) > 0:
+		return p.final, fmt.Errorf("softmagic: %s\n%s", p.errs[0], usageText)
+	}
+	return p.final, nil
 }

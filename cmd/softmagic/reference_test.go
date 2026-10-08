@@ -207,13 +207,13 @@ func isCharDevice(path string, d fs.DirEntry) bool {
 // terminal with nothing to read is stable, not a hang.
 func volatile(path string) bool {
 	var first []byte
-	for i := range 2 {
-		f, err := openForRead(path)
+	for i := range 2 { // attempt
+		f, err := openForRead(path) // openedFile
 		if err != nil {
 			return false
 		}
 		buf := make([]byte, 4096)
-		n, rerr := readOnce(f, buf)
+		n, rerr := readOnce(f, buf) // bytesRead
 		if cerr := f.Close(); cerr != nil || rerr != nil {
 			return false
 		}

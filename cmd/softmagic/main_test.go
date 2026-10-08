@@ -42,7 +42,7 @@ func capture(t *testing.T, stdin string, args ...string) (string, string, int) {
 			t.Error(err)
 		}
 	}
-	in := create("in")
+	in := create("in") // inputFile
 	defer closeFile(in)
 	out := create("out")
 	defer closeFile(out)
@@ -89,7 +89,7 @@ func TestCorpus(t *testing.T) {
 		t.Fatal("no corpus files")
 	}
 	flags := [][]string{{"-b"}, {"-b", "-i"}, {"-b", "--extension"}, {"-b", "--apple"}}
-	for _, f := range files {
+	for _, f := range files { // fileName
 		want, err := os.ReadFile(strings.TrimSuffix(f, ".testfile") + ".expect")
 		if err != nil {
 			t.Fatal(err)
@@ -98,7 +98,7 @@ func TestCorpus(t *testing.T) {
 		if len(lines) != 4 {
 			t.Fatalf("%s: expect file has %d lines", f, len(lines))
 		}
-		for i, fl := range flags {
+		for i, fl := range flags { // flagSet
 			out, errOut, code := capture(t, "", append(fl, f)...)
 			if code != 0 || errOut != "" {
 				t.Errorf("%s %v: exit %d, stderr %q", f, fl, code, errOut)
@@ -112,7 +112,7 @@ func TestCorpus(t *testing.T) {
 
 func TestPadding(t *testing.T) {
 	dir := corpusDir(t)
-	a, b := filepath.Join(dir, "a.testfile"), filepath.Join(dir, "bzip3.testfile")
+	a, b := filepath.Join(dir, "a.testfile"), filepath.Join(dir, "bzip3.testfile") // bzip3File
 	out, _, _ := capture(t, "", "--mime-type", a, b)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], a+":     ") || !strings.HasPrefix(lines[1], b+": ") {
@@ -178,8 +178,8 @@ func TestOptions(t *testing.T) {
 		!strings.Contains(out, "implements file 5.48") {
 		t.Fatalf("--version: %q", out)
 	}
-	d := t.TempDir()
-	f := filepath.Join(d, "sh")
+	d := t.TempDir()            // tempDir
+	f := filepath.Join(d, "sh") // scriptPath
 	writeFile(t, f, "#!/bin/sh\necho\n")
 	out, _, _ = capture(t, "", "--json", f)
 	// The name is compared as JSON encodes it: a Windows path's backslashes

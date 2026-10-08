@@ -17,5 +17,6 @@ func accessTime(info os.FileInfo) (time.Time, bool) {
 	if !ok {
 		return time.Time{}, false
 	}
+	// The conversions are needed where the fields are 32 bits (32-bit Linux).
 	return time.Unix(int64(st.Atim.Sec), int64(st.Atim.Nsec)), true
 }

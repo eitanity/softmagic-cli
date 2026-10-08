@@ -18,8 +18,8 @@ import (
 // database with the colon-separated directories, each its own sorted map
 // searched in order; --extra-magic appends directories to whichever
 // database is in use.
-func loadDatabase(o options) (*softmagic.Database, error) {
-	var db *softmagic.Database
+func loadDatabase(o options) (*softmagic.Database, error) { // opts
+	var db *softmagic.Database // database
 	var err error
 	if o.magicDirs == "" {
 		if db, err = softmagic.Default(); err != nil {
@@ -61,7 +61,7 @@ func compileDirs(base *softmagic.Database, dirs string) (*softmagic.Database, er
 	return base, nil
 }
 
-func printVersion(w io.Writer) {
+func printVersion(w io.Writer) { // out
 	hash := "unavailable"
 	if db, err := softmagic.Default(); err == nil {
 		hash = db.Hash()
@@ -78,7 +78,7 @@ func printVersion(w io.Writer) {
 // none is known. Nothing here is kept in step with a tag by hand.
 func buildVersions() (cli, lib string) {
 	cli, lib = "(unknown)", "(unknown)"
-	bi, ok := debug.ReadBuildInfo()
+	bi, ok := debug.ReadBuildInfo() // buildInfo
 	if !ok {
 		return cli, lib
 	}
