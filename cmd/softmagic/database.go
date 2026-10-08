@@ -95,3 +95,11 @@ func buildVersions() (cli, lib string) {
 	}
 	return cli, lib
 }
+
+// splitDirs is a colon-separated directory list, none when empty.
+func splitDirs(dirs string) []string {
+	if dirs == "" {
+		return nil
+	}
+	return strings.Split(dirs, ":")
+}

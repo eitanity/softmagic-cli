@@ -168,7 +168,7 @@ func TestOptions(t *testing.T) {
 	if code != 1 || out != "" || !strings.HasPrefix(errOut, "Usage:") {
 		t.Fatalf("no files: %q %q %d", out, errOut, code)
 	}
-	for _, bad := range [][]string{{"-z", "x"}, {"-P", "elf_phnum=1", "x"}, {"-Q", "x"}} {
+	for _, bad := range [][]string{{"-z", "x"}, {"-P", "nosuch=1", "x"}, {"-Q", "x"}} {
 		if _, errOut, code := capture(t, "", bad...); code != 1 || errOut == "" {
 			t.Errorf("%v accepted", bad)
 		}

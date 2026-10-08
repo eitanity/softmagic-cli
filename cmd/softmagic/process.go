@@ -24,12 +24,14 @@ const pipeBuf = 4096
 // driver is the per-run state: the database, the options, the output and
 // the read buffer, allocated once.
 type driver struct {
-	db    *softmagic.Database
-	o     options
-	stdin *os.File
-	w     *bufio.Writer
-	buf   []byte
-	err   error // the first output error; the reference's haderror
+	jsonLine string // --json: the line render made from a library Result
+	failed   bool   // the answer being finished is libmagic's error text: printed as it is, exit 1
+	db       *softmagic.Database
+	o        options
+	stdin    *os.File
+	w        *bufio.Writer
+	buf      []byte
+	err      error // the first output error; the reference's haderror
 }
 
 // out writes to standard output, keeping the first error.
@@ -55,8 +57,11 @@ func (d *driver) flush() bool {
 
 func newDriver(db *softmagic.Database, o options, stdin, stdout *os.File) *driver {
 	limit := o.maxBytes
-	if limit <= 0 {
+	switch {
+	case limit == 0:
 		limit = softmagic.DefaultMaxBytes
+	case limit < 0:
+		limit = 0 // -P bytes=0
 	}
 	return &driver{db: db, o: o, stdin: stdin, w: bufio.NewWriterSize(stdout, 64*1024), buf: make([]byte, limit)}
 }
@@ -80,6 +85,9 @@ func (d *driver) processNames(names []string, fromList bool) bool {
 // process is file.c's process(): one line for one name. It reports
 // whether the line was error-free.
 func (d *driver) process(name string, wid int) bool {
+	if d.o.mode == modeJSON {
+		return d.processJSON(name)
+	}
 	if wid > 0 && !d.o.brief {
 		d.printName(name, wid)
 	}
@@ -138,12 +146,35 @@ func (d *driver) answer(name string) (string, bool) {
 		return d.finish(text, true)
 	}
 	defer func() { _ = f.Close() }()
+	if d.o.keepAtime {
+		defer restoreTimes(f, name)()
+	}
 	return d.finish(d.fromFile(f, name, text))
+}
+
+// restoreTimes is -p: it notes the file's access and modification times
+// before it is read, and returns what puts them back afterwards, as the
+// reference's close_and_restore does with utimes. A platform that does not
+// say when a file was last read restores nothing.
+func restoreTimes(f *os.File, name string) func() {
+	info, err := f.Stat()
+	if err != nil {
+		return func() {}
+	}
+	atime, ok := accessTime(info)
+	if !ok {
+		return func() {}
+	}
+	return func() { _ = os.Chtimes(name, atime, info.ModTime()) }
 }
 
 // finish is file_getbuffer: nothing said is an error with no message,
 // and an answer has its unprintable characters escaped unless -r.
 func (d *driver) finish(text string, ok bool) (string, bool) {
+	if d.failed {
+		d.failed = false
+		return text, false
+	}
 	if ok && text == "" {
 		return "ERROR: (null)", false
 	}
@@ -198,7 +229,8 @@ func escapeOutput(text string) string {
 func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) {
 	info, serr := f.Stat()
 	okstat := serr == nil
-	opts := softmagic.Options{MaxBytes: d.o.maxBytes, Continue: d.o.keepGoing, Raw: d.o.raw}
+	opts := softmagic.Options{MaxBytes: d.o.maxBytes, Continue: d.o.keepGoing, Raw: d.o.raw,
+		Exclude: d.o.exclude, Limits: d.o.limits}
 	if okstat {
 		opts.Executable = info.Mode()&0o111 != 0
 	}
@@ -246,6 +278,18 @@ func readPipe(f *os.File, buf []byte) int {
 // printed and puts ", " before its own description unless a text rule
 // printed something; that quirk is reproduced.
 func (d *driver) render(name, prefix string, r softmagic.Result) string {
+	if d.o.mode != modeJSON {
+		f := r.Failures
+		if d.o.keepGoing {
+			f = r.Continued.Failures
+		}
+		if fail := d.failureFor(f); fail.Failed() {
+			// A hard limit stopped this mode: file prints libmagic's error
+			// unescaped, and exits 1 for it, -E or not.
+			d.failed = true
+			return "ERROR: " + fail.Text(prefix)
+		}
+	}
 	if d.o.keepGoing && d.o.mode != modeJSON {
 		return d.renderContinued(prefix, r)
 	}
@@ -267,12 +311,29 @@ func (d *driver) render(name, prefix string, r softmagic.Result) string {
 		}
 		return r.Apple
 	case modeJSON:
-		return renderJSON(name, prefix, r)
+		d.jsonLine = renderJSON(name, prefix, r)
+		return d.jsonLine
 	default:
 		if prefix != "" && r.Phase == softmagic.PhaseText && len(r.Rules) == 0 {
 			return prefix + ", " + r.Description
 		}
 		return prefix + r.Description
+	}
+}
+
+// failureFor is the error of the output mode this run prints.
+func (d *driver) failureFor(f softmagic.Failures) softmagic.Failure {
+	switch d.o.mode {
+	case modeMime, modeMimeType:
+		return f.MIME
+	case modeMimeEncoding:
+		return f.Encoding
+	case modeExtension:
+		return f.Extension
+	case modeApple:
+		return f.Apple
+	default:
+		return f.Description
 	}
 }
 
@@ -306,19 +367,58 @@ func (d *driver) renderContinued(prefix string, r softmagic.Result) string {
 // FILE_SEPARATOR.
 func joinAnswers(a []string) string { return strings.Join(a, "\n- ") }
 
+// processJSON is process for --json: one JSON object per line and nothing
+// else, whether the answer came from the library, from the stat layer
+// (directories, devices, links) or was an error.
+func (d *driver) processJSON(name string) bool {
+	d.jsonLine = ""
+	text, ok := d.answer(name)
+	line := d.jsonLine
+	if line == "" {
+		line = jsonStat(name, text, ok)
+	}
+	d.out(line)
+	d.outByte('\n')
+	if d.o.noBuffer {
+		return d.flush() && ok
+	}
+	return ok && d.err == nil
+}
+
+// jsonStat is the --json record of an answer the library did not give: the
+// stat layer's words, or an error without its "ERROR: ".
+func jsonStat(name, text string, ok bool) string {
+	if name == "-" || name == "" {
+		name = "/dev/stdin"
+	}
+	rec := jsonLine{Name: name}
+	if msg, isErr := strings.CutPrefix(text, "ERROR: "); isErr || !ok {
+		rec.Error = msg
+	} else {
+		rec.Answer = text
+	}
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return `{"error":"` + err.Error() + `"}`
+	}
+	return string(b)
+}
+
 // jsonLine is the --json record: the name, the stat layer's mode words
 // and the library's Result.
 type jsonLine struct {
-	Name   string           `json:"name"`
-	Modes  string           `json:"modes,omitempty"`
-	Result softmagic.Result `json:"result"`
+	Name   string            `json:"name"`
+	Modes  string            `json:"modes,omitempty"`  // the stat layer's words before a library answer
+	Answer string            `json:"answer,omitempty"` // the stat layer's whole answer
+	Error  string            `json:"error,omitempty"`
+	Result *softmagic.Result `json:"result,omitempty"`
 }
 
 func renderJSON(name, prefix string, r softmagic.Result) string {
 	if name == "" {
 		name = "/dev/stdin"
 	}
-	b, err := json.Marshal(jsonLine{Name: name, Modes: strings.TrimSpace(prefix), Result: r})
+	b, err := json.Marshal(jsonLine{Name: name, Modes: strings.TrimSpace(prefix), Result: &r})
 	if err != nil {
 		return `{"error":"` + err.Error() + `"}`
 	}

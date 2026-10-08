@@ -10,17 +10,28 @@ byte, for every mode the library implements, with the same exit codes.
 go install github.com/eitanity/softmagic-cli/cmd/softmagic@latest
 ```
 
-The binary is called `softmagic`. It is built against the tagged library,
-`github.com/eitanity/softmagic` v0.1.0.
+The binary is called `softmagic`. It is built against the tagged library
+`github.com/eitanity/softmagic`; `softmagic --version` names both versions.
 
 ## Usage
 
 ```
-softmagic [-bEhikLnNrs0] [--apple] [--extension] [--mime-encoding] [--mime-type]
+softmagic [-bEhikLnNprsS0] [--apple] [--extension] [--mime-encoding] [--mime-type]
           [--json] [-F <separator>] [-m <magicdirs>] [--extra-magic <dirs>]
-          [--max-bytes <n>] [-P bytes=<n>] [-f <namefile>] <file> ...
+          [--max-bytes <n>] [-P <name>=<value>] [-e <check>] [--exclude-quiet <check>]
+          [-f <namefile>] <file> ...
+softmagic [-m <magicdirs>] -l
+softmagic [-m <magicdirs>] -c
 softmagic --version
 ```
+
+Options are read as `file`'s `getopt_long` reads them: every option has its long name too
+(`--brief`, `--keep-going`, `--magic-file`, ...; `softmagic --help` lists them), a long name may
+be cut to any unambiguous prefix (`--mime-t`), short options group (`-bik`) and take their value
+attached (`-ejson`, `-Pbytes=10`, `-F@`), options may follow file names, `--` ends them, and
+`POSIXLY_CORRECT` makes the first name end them and `-L` the default. A `-f` list is read where
+the `-f` stands: options after the first `-f` change only what is printed (`-b`, `-N`, `-0`,
+`-F`, `-n`) and the `-P` limits, as in `file`.
 
 | Flag | Meaning, as in `file(1)` |
 |---|---|
@@ -29,7 +40,7 @@ softmagic --version
 | `--mime-type`, `--mime-encoding` | one half of `-i` |
 | `--extension` | the rule's extension list, `???` when none |
 | `--apple` | the rule's Apple creator/type, `UNKNUNKN` when none |
-| `--json` | one JSON object per line: the name, the stat layer's mode words and the library's `Result`, so what was examined is visible |
+| `--json` | one JSON object per line and nothing else: `name`, then the library's `result` (with the stat layer's words before it in `modes`), or the stat layer's own `answer` for a directory, device or link, or an `error` |
 | `-N` | no padding of the answers into a column |
 | `-n` | flush after every file; a `-f` list prints each name at its own width |
 | `-0` | a NUL after the file name; `-00` and no separator or newline at all |
@@ -42,11 +53,18 @@ softmagic --version
 | `-f file` | file names one per line from `file`, `-` for standard input, printed before any names on the command line |
 | `-m dirs` | replace the embedded database with the magic source in these colon-separated directories |
 | `--extra-magic dirs` | append magic source directories to whichever database is in use |
-| `--max-bytes n`, `-P bytes=n` | consult at most `n` bytes of each file (default 7 MiB, as `file`) |
+| `--max-bytes n` | consult at most `n` bytes of each file (default 7 MiB, as `file`) |
+| `-P name=value` | one of `file`'s limits: `bytes`, `elf_notes`, `elf_phnum`, `elf_shnum`, `elf_shsize`, `encoding`, `indir`, `name`, `regex`, `magwarn` (accepted, no effect); repeatable, and the name may be cut short (`-P b=100`) as `file` allows. Reaching `indir`, `name` or `elf_shsize` is an error, `ERROR: ...` and exit 1, as in `file` |
+| `-e check`, `--exclude-quiet check` | switch a check off: `apptype`, `ascii`, `cdf`, `compress`, `csv`, `elf`, `encoding`, `json`, `simh`, `soft`, `tar`, `text`, `tokens`; an unknown name is a usage error after `-e` and ignored after `--exclude-quiet` |
+| `-l` | print the database in matching order, as `file -l` |
+| `-c` | print the parsed form of every rule line in `-m`'s directories, on standard error, as `file -c` does; the built-in database is compiled already, as a `.mgc` file is, and prints nothing |
+| `-p` | put back each file's access time after reading it |
+| `-S` | accepted, no effect: there is no sandbox to switch off |
 | `-` | standard input, named `/dev/stdin` |
 
-`-z` (look inside compressed files) is refused: it is a non-goal of the
-library. The other `-P` parameters are limits the library fixes.
+`-z` and `-Z` (look inside compressed files), `-C` (write a `.mgc`) and `-d` (libmagic's debug
+trace) are refused by name: they are non-goals of the library. `-c` reports a refused rule in
+the library's words, not libmagic's.
 
 ## What is identical
 
@@ -76,11 +94,22 @@ combinations with `-k`, `-b`, `-N`, `-0`, `-00`, `-F`, `-n`, `-r`, `-s`, `-L`, `
 
 Known differences:
 
-- `--version` and the usage text are this program's own.
 - `-m` and `--extra-magic` take source directories, not compiled `.mgc` files.
 - A name holding an East Asian wide character pads one column short of `file`.
-- `file`'s `-C`, `-c`, `-d`, `-e`, `-l`, `-p`, `-S`, `-z`, `-Z` and
-  `--exclude-quiet` are not provided.
+- `file`'s `-C`, `-d`, `-z` and `-Z` are not provided. `-c` reports a refused rule in the
+  library's words, after the lines before it, where `file` warns and goes on. With several
+  `-m` directories, `file -c` prefixes the second and later warnings with bytes read from freed
+  memory; this program prints those warnings without a prefix.
+- `--help`, `--version` and the usage text are this program's own, as are the words of an
+  option error; the exit codes are `file`'s.
+- Beyond any default limit: where `file` reports "Output buffer space exceeded" (one printed
+  piece over 1,024 bytes), the library cuts the answer at 4,096 bytes instead; `use` nesting
+  stops at 32 levels before a `-P name` above 31 is reached; and an ELF note section over
+  16 MiB is not read, where `file` reads up to `elf_shsize` (128 MiB by default). On a file
+  larger than the window, a `search`, `regex`, `der`, `use` or `indirect` rule counted from the
+  end still counts from the window's end; rules that read one value read the file's own tail,
+  as `file` does.
+- An error message about `-P` or `-e` names this program, not `file`.
 
 ## Platforms
 
@@ -108,12 +137,13 @@ make compare DIRS=/usr/bin:/etc:/dev
 `make reference` (which `compare` runs first) downloads file 5.48's release tarball, checks
 it against a pinned SHA-256, and builds it statically into `.reference/`, with the database
 compiled from that release's Magdir. `make compare` then runs `softmagic` and that binary side
-by side over the corpus and every path under `DIRS`, in nineteen output modes: default, `-b`,
-`-i`, `--mime-type`, `--mime-encoding`, `--extension`, `--apple`, `-L`, `-N`, `-E`, `-r`, `-k`
-with each of the five output modes, and `-k -r -E` with and without `--mime-type` (the flags
-azul passes to libmagic). Each mode is a subtest, so `go test -run 'TestReference/-k'` selects
-some. It requires
-stdout, stderr and the exit code to be byte-identical, and lists every difference. Building the
+by side over the corpus and every path under `DIRS`, in 63 modes: default, `-b`, `-i`,
+`--mime-type`, `--mime-encoding`, `--extension`, `--apple`, `-L`, `-N`, `-E`, `-r`; `-k` with
+each output mode, and `-k -r -E` with and without `--mime-type` (the flags azul passes to
+libmagic); every `-e` name, alone and with `-i`, `-k` and `--extension`; and every `-P`
+parameter at a value that changes answers, including the three that stop with an error, alone
+and with the other modes. Each mode is a subtest, so `go test -run 'TestReference/-k'` selects
+some. It requires stdout, stderr and the exit code to be byte-identical, and lists every difference. Building the
 reference needs a C compiler and `make`. A host's own `file` is not a substitute: it is usually
 another release.
 

@@ -40,6 +40,50 @@ var referenceModes = [][]string{
 	{"-k", "--apple"},
 	{"-k", "-r", "-E"},
 	{"-k", "-r", "-E", "--mime-type"},
+	{"-e", "soft"},
+	{"-e", "text"},
+	{"-e", "ascii"},
+	{"-e", "encoding"},
+	{"-e", "tar"},
+	{"-e", "json"},
+	{"-e", "csv"},
+	{"-e", "simh"},
+	{"-e", "cdf"},
+	{"-e", "elf"},
+	{"-e", "compress"},
+	{"-e", "apptype"},
+	{"-e", "tokens"},
+	{"-i", "-e", "encoding"},
+	{"-i", "-e", "text"},
+	{"--extension", "-e", "soft"},
+	{"-k", "-e", "text"},
+	{"-k", "-i", "-e", "soft"},
+	{"-k", "-e", "json", "-e", "encoding"},
+	{"--exclude-quiet", "nosuch", "-e", "elf"},
+	{"-P", "indir=0"},
+	{"-P", "indir=1"},
+	{"-P", "name=1"},
+	{"-P", "name=2"},
+	{"-P", "regex=0"},
+	{"-P", "regex=16"},
+	{"-P", "encoding=0"},
+	{"-P", "encoding=16"},
+	{"-P", "elf_notes=1"},
+	{"-P", "elf_phnum=3"},
+	{"-P", "elf_shnum=5"},
+	{"-P", "elf_shsize=100"},
+	{"-P", "bytes=0"},
+	{"-P", "bytes=100"},
+	{"-P", "magwarn=0"},
+	{"-P", "b=50", "-P", "in=2"},
+	{"-k", "-P", "name=1"},
+	{"-k", "-P", "indir=1"},
+	{"-i", "-P", "indir=1"},
+	{"--mime-type", "-P", "name=1"},
+	{"--mime-encoding", "-P", "name=1"},
+	{"--extension", "-P", "indir=1"},
+	{"--apple", "-P", "name=1"},
+	{"-k", "-i", "-P", "elf_shsize=100"},
 }
 
 // referenceBatch is how many files go to one invocation. The padding of the
@@ -126,7 +170,7 @@ func referenceInputs(t *testing.T) []string {
 			continue
 		}
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if d != nil && d.Type()&fs.ModeCharDevice != 0 && volatile(path) {
+			if d != nil && isCharDevice(path, d) && volatile(path) {
 				t.Logf("skipped %s: its content changes from read to read", path)
 				return nil
 			}
@@ -142,6 +186,19 @@ func referenceInputs(t *testing.T) []string {
 	}
 	sort.Strings(files)
 	return files
+}
+
+// isCharDevice reports whether path is a character device or a symbolic
+// link to one: the modes that read through links read the device.
+func isCharDevice(path string, d fs.DirEntry) bool {
+	if d.Type()&fs.ModeCharDevice != 0 {
+		return true
+	}
+	if d.Type()&fs.ModeSymlink == 0 {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && info.Mode()&fs.ModeCharDevice != 0
 }
 
 // volatile reports whether two reads of a device return different bytes, as
@@ -203,7 +260,13 @@ func compareBatch(t *testing.T, ref string, mode, batch []string) []string {
 // runReference runs the reference file(1) with its own database.
 func runReference(t *testing.T, ref string, args []string) (string, string, int) {
 	t.Helper()
-	cmd := exec.Command(filepath.Join(ref, "file"), append([]string{"-m", filepath.Join(ref, "magic.mgc")}, args...)...)
+	return runReferenceRaw(t, ref, append([]string{"-m", filepath.Join(ref, "magic.mgc")}, args...))
+}
+
+// runReferenceRaw runs the reference file(1) with exactly these arguments.
+func runReferenceRaw(t *testing.T, ref string, args []string) (string, string, int) {
+	t.Helper()
+	cmd := exec.Command(filepath.Join(ref, "file"), args...)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	code := 0
