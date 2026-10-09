@@ -74,7 +74,7 @@ func fsmagic(o options, name string) (string, int) { // opts
 		if o.errExit {
 			return fmt.Sprintf("cannot stat `%s' (%s)", name, cerror(err)), fsError
 		}
-		return fmt.Sprintf("cannot open `%s' (%s)", name, cerror(err)), fsContinue
+		return fmt.Sprintf("cannot open `%s' (%s)", o.fsText(name), cerror(err)), fsContinue
 	}
 	var b fsBuf // answerBuf
 	mime, silent := isMime(o), isSilent(o)
@@ -162,15 +162,15 @@ func symlinkAnswer(o options, name string, b *fsBuf) int { // opts
 	target, err := os.Readlink(name)
 	if err != nil {
 		if o.errExit {
-			b.text = fmt.Sprintf("unreadable symlink `%s' (%s)", name, cerror(err))
+			b.text = fmt.Sprintf("unreadable symlink `%s' (%s)", o.fsText(name), cerror(err))
 			return fsError
 		}
-		return inode(o, b, fmt.Sprintf("unreadable symlink `%s' (%s)", name, cerror(err)), "symlink")
+		return inode(o, b, fmt.Sprintf("unreadable symlink `%s' (%s)", o.fsText(name), cerror(err)), "symlink")
 	}
 	if _, err := os.Stat(name); err != nil {
 		return badLink(o, b, target, err)
 	}
-	return inode(o, b, "symbolic link to "+target, "symlink")
+	return inode(o, b, "symbolic link to "+o.fsText(target), "symlink")
 }
 
 // badLink is bad_link: a dangling symbolic link. Only the MIME type is
@@ -181,10 +181,10 @@ func badLink(o options, b *fsBuf, target string, err error) int { // answerBuf
 		b.text += "inode/symlink"
 	case isMime(o):
 	case o.errExit:
-		b.text = fmt.Sprintf("broken symbolic link to %s (%s)", target, cerror(err))
+		b.text = fmt.Sprintf("broken symbolic link to %s (%s)", o.fsText(target), cerror(err))
 		return fsError
 	default:
-		b.text += "broken symbolic link to " + target
+		b.text += "broken symbolic link to " + o.fsText(target)
 	}
 	return fsDone
 }

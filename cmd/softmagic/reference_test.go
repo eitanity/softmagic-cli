@@ -286,3 +286,26 @@ func lineAt(lines []string, i int) string {
 	}
 	return "<missing>"
 }
+
+// TestReferenceNames compares how names outside ASCII are printed and
+// padded: characters glibc's iswprint accepts and Go's unicode.IsPrint does
+// not, wide and combining characters, and invalid bytes, in a UTF-8 locale.
+func TestReferenceNames(t *testing.T) {
+	ref := referenceDir(t)
+	t.Setenv("LC_ALL", "C.UTF-8")
+	dir := t.TempDir()
+	var files []string
+	for _, name := range []string{"café", "a\u202eb", "漢字", "e\u0301", "a\u00a0b", "x\u0085y",
+		"\ue000", "\U0001F600", "a\u2028b", "a\u200bb", "bad\xffbyte", "tab\tname"} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("x\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, path)
+	}
+	for _, mode := range [][]string{{}, {"-r"}, {"-N"}, {"-0"}} {
+		for _, d := range compareBatch(t, ref, mode, files) {
+			t.Error(d)
+		}
+	}
+}

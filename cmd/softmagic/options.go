@@ -39,6 +39,7 @@ type options struct {
 	followLinks bool             // -L (default off: -h)
 	devices     bool             // -s
 	raw         bool             // -r
+	safeText    bool             // --safe-text: text from files and names as \xHH, see names.go
 	keepGoing   bool             // -k: every match, libmagic's MAGIC_CONTINUE
 	exclude     softmagic.Checks // -e, --exclude-quiet
 	limits      softmagic.Limits // -P
@@ -54,7 +55,7 @@ type options struct {
 }
 
 const usageText = `Usage: softmagic [-bcEhikLlNnprsS0] [--apple] [--extension] [--mime-encoding]
-                 [--mime-type] [--json] [-e <check>] [-F <separator>] [-f <namefile>]
+                 [--mime-type] [--json] [--safe-text] [-e <check>] [-F <separator>] [-f <namefile>]
                  [-m <magicdirs>] [--extra-magic <dirs>] [-P <name>=<value>] <file> ...
        softmagic [-m <magicdirs>] -c
        softmagic [-m <magicdirs>] -l
@@ -104,6 +105,9 @@ Determine type of FILEs, as file(1) 5.48 does.
 
 This program's own:
       --json                 one JSON object per line: name and the library's Result
+      --safe-text            write every byte taken from a file or a name as \xHH
+                               unless it is printable ASCII other than a backslash,
+                               a backquote and < > & " '
       --extra-magic DIRS     append colon-separated rule directories to the database
       --max-bytes N          as -P bytes=N
 
@@ -179,7 +183,7 @@ func withLibFlags(cur, lib options, atList bool) options {
 	o := cur // merged
 	o.mime, o.mimeType, o.mimeEncoding = lib.mime, lib.mimeType, lib.mimeEncoding
 	o.extension, o.apple, o.jsonOut = lib.extension, lib.apple, lib.jsonOut
-	o.keepGoing, o.raw, o.exclude = lib.keepGoing, lib.raw, lib.exclude
+	o.keepGoing, o.raw, o.safeText, o.exclude = lib.keepGoing, lib.raw, lib.safeText, lib.exclude
 	o.followLinks, o.devices, o.errExit, o.keepAtime = lib.followLinks, lib.devices, lib.errExit, lib.keepAtime
 	o.magicDirs, o.extraDirs = lib.magicDirs, lib.extraDirs
 	if atList {
@@ -246,6 +250,8 @@ func (o *options) applyFlag(spec *optSpec) {
 		o.mimeEncoding = true
 	case "json":
 		o.jsonOut = true
+	case "safe-text":
+		o.safeText = true
 	case "keep-going":
 		o.keepGoing = true
 	case "list":

@@ -52,6 +52,7 @@ var optSpecs = []optSpec{
 	{long: "debug", short: 'd'},
 	{short: 'E'}, // -E has no long name
 	{long: "json", own: true},
+	{long: "safe-text", own: true},
 	{long: "max-bytes", arg: true, own: true},
 	{long: "extra-magic", arg: true, own: true},
 }

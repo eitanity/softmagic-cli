@@ -1,4 +1,4 @@
-.PHONY: build install test vet lint reference compare
+.PHONY: build install test vet lint reference compare wctype
 
 build:
 	go build -o softmagic ./cmd/softmagic
@@ -17,6 +17,12 @@ reference:
 # (colon-separated, walked recursively), in every output mode.
 compare: reference
 	SOFTMAGIC_REFERENCE_DIRS="$(DIRS)" go test -count=1 -timeout 60m -run TestReference -v ./cmd/softmagic
+
+# Regenerates the iswprint and wcwidth table from this host's glibc.
+wctype:
+	cc -O2 -o .wctype scripts/wctype.c
+	./.wctype main > cmd/softmagic/wctype.go
+	rm -f .wctype
 
 vet:
 	go vet ./...

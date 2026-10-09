@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestMain(m *testing.M) {
@@ -234,7 +235,8 @@ func TestEscapeOutput(t *testing.T) {
 		"tab\there":     "tab\\011here",
 		"ü ok":          "ü ok",
 		"\xff raw":      "\\377 raw",
-		"a\u200bb":      "a\\342\\200\\213b",
+		"a\u200bb":      "a\u200bb", // glibc's iswprint accepts format characters
+		"a\u2028b":      "a\\342\\200\\250b",
 		"\x01 and \xff": "\\001 and \\377",
 	}
 	for in, want := range cases {
@@ -249,5 +251,54 @@ func TestEscapeOutput(t *testing.T) {
 	buf.WriteString(nameText("\xff", false))
 	if buf.String() != "\\377" {
 		t.Error("invalid byte in name")
+	}
+}
+
+// TestNameWidths: names print and pad as glibc's iswprint and wcwidth say
+// in a UTF-8 locale.
+func TestNameWidths(t *testing.T) {
+	for _, c := range []struct {
+		name, text string
+		width, raw int
+	}{
+		{"漢字", "漢字", 4, 4},                 // wide: two columns each
+		{"e\u0301", "e\u0301", 2, 2},       // a combining mark counts one
+		{"a\u202eb", "a\u202eb", 3, 3},     // a bidi override is printable
+		{"\ue000", "\ue000", 1, 1},         // private use is printable
+		{"x\u0085y", "x\\205y", 6, 3},      // NEL is not: its low byte, escaped
+		{"x\u2028y", "x\\050y", 6, 3},      // nor a line separator
+		{"\U0001F600", "\U0001F600", 2, 2}, // emoji: wide
+		{"a\xffb", "a\\377b", 6, 6},        // an invalid byte is four columns, raw or not
+	} {
+		if got := nameText(c.name, false); got != c.text {
+			t.Errorf("nameText(%q) = %q, want %q", c.name, got, c.text)
+		}
+		if got := nameWidth(c.name, false); got != c.width {
+			t.Errorf("nameWidth(%q) = %d, want %d", c.name, got, c.width)
+		}
+		if got := nameWidth(c.name, true); got != c.raw {
+			t.Errorf("raw nameWidth(%q) = %d, want %d", c.name, got, c.raw)
+		}
+	}
+}
+
+// TestPrintRanges: the generated table is sorted, does not overlap, holds
+// no surrogate and gives one or two columns.
+func TestPrintRanges(t *testing.T) {
+	prev := rune(-1)
+	for _, p := range printRanges {
+		if p.lo <= prev || p.hi < p.lo || p.hi > utf8.MaxRune {
+			t.Fatalf("range %#x-%#x out of order after %#x", p.lo, p.hi, prev)
+		}
+		if p.lo <= 0xdfff && p.hi >= 0xd800 {
+			t.Fatalf("range %#x-%#x holds surrogates", p.lo, p.hi)
+		}
+		if p.width != 1 && p.width != 2 {
+			t.Fatalf("range %#x-%#x has width %d", p.lo, p.hi, p.width)
+		}
+		prev = p.hi
+	}
+	if printWidth(' ') != 1 || printWidth('~') != 1 || printWidth(0x7f) != 0 || printWidth(0x10ffff) != 0 {
+		t.Error("ASCII and the last code point")
 	}
 }

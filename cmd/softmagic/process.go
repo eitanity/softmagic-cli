@@ -12,7 +12,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/eitanity/softmagic"
@@ -70,11 +69,11 @@ func newDriver(db *softmagic.Database, o options, stdin, stdout *os.File) *drive
 // processNames is the reference's loop: one width for the whole list,
 // except that -n makes a -f list print each name at its own width.
 func (d *driver) processNames(names []string, fromList bool) bool {
-	wid := maxWidth(names, d.o.raw)
+	wid := maxWidth(names, d.o)
 	ok := true // allOK
 	for _, name := range names {
 		if fromList && d.o.noBuffer {
-			wid = nameWidth(name, d.o.raw)
+			wid = d.o.shownWidth(name)
 		}
 		if !d.process(name, wid) {
 			ok = false
@@ -93,6 +92,9 @@ func (d *driver) process(name string, wid int) bool {
 		d.printName(name, wid)
 	}
 	text, ok := d.answer(name) // answered
+	if d.o.safeText {
+		text = safeOutput(text)
+	}
 	d.out(text)
 	if d.o.nulSep > 1 {
 		d.outByte(0)
@@ -111,7 +113,7 @@ func (d *driver) printName(name string, wid int) {
 	if name == "-" {
 		pname = "/dev/stdin"
 	}
-	d.out(nameText(pname, d.o.raw))
+	d.out(d.o.shownName(pname))
 	if d.o.nulSep > 0 {
 		d.outByte(0)
 	}
@@ -119,7 +121,7 @@ func (d *driver) printName(name string, wid int) {
 		d.out(d.o.separator)
 		pad := 0
 		if !d.o.noPad {
-			pad = wid - nameWidth(name, d.o.raw)
+			pad = wid - d.o.shownWidth(name)
 		}
 		d.out(strings.Repeat(" ", pad))
 		d.outByte(' ')
@@ -179,15 +181,15 @@ func (d *driver) finish(text string, ok bool) (string, bool) { // answered
 	if ok && text == "" {
 		return "ERROR: (null)", false
 	}
-	if ok && !d.o.raw {
+	if ok && !d.o.raw && !d.o.safeText {
 		return escapeOutput(text), ok
 	}
 	return text, ok
 }
 
-// escapeOutput is file_getbuffer's escaping: valid UTF-8 keeps its
-// printable characters and escapes the bytes of the others; anything
-// else is escaped byte by byte as the C locale would.
+// escapeOutput is file_getbuffer's escaping: valid UTF-8 keeps the
+// characters iswprint accepts and escapes the bytes of the others;
+// anything else is escaped byte by byte as the C locale would.
 func escapeOutput(text string) string {
 	if !utf8.ValidString(text) {
 		var b strings.Builder // escaped
@@ -202,7 +204,7 @@ func escapeOutput(text string) string {
 	}
 	clean := true
 	for _, r := range text {
-		if !unicode.IsPrint(r) && r != ' ' {
+		if printWidth(r) == 0 {
 			clean = false
 			break
 		}
@@ -213,7 +215,7 @@ func escapeOutput(text string) string {
 	var b strings.Builder        // escaped
 	for i := 0; i < len(text); { // byteIdx
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if unicode.IsPrint(r) || r == ' ' {
+		if printWidth(r) > 0 {
 			b.WriteString(text[i : i+size])
 		} else {
 			for k := 0; k < size; k++ {
@@ -231,7 +233,7 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) { // f
 	info, serr := f.Stat()
 	okstat := serr == nil
 	opts := softmagic.Options{MaxBytes: d.o.maxBytes, Continue: d.o.keepGoing, Raw: d.o.raw,
-		Exclude: d.o.exclude, Limits: d.o.limits}
+		SafeText: d.o.safeText, Exclude: d.o.exclude, Limits: d.o.limits}
 	if okstat {
 		opts.Executable = info.Mode()&0o111 != 0
 	}
@@ -252,7 +254,7 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) { // f
 		if name == "" {
 			name = "/dev/stdin"
 		}
-		return "ERROR: " + prefix + "cannot read `" + name + "' (" + cerror(err) + ")", false
+		return "ERROR: " + prefix + "cannot read `" + d.o.fsText(name) + "' (" + cerror(err) + ")", false
 	}
 	r := d.db.IdentifyWith(context.Background(), d.buf[:n], opts)
 	return d.render(name, prefix, r), true
@@ -312,7 +314,7 @@ func (d *driver) render(name, prefix string, r softmagic.Result) string { // res
 		}
 		return r.Apple
 	case modeJSON:
-		d.jsonLine = renderJSON(name, prefix, r)
+		d.jsonLine = renderJSON(d.o.jsonName(name), prefix, r)
 		return d.jsonLine
 	default:
 		if prefix != "" && r.Phase == softmagic.PhaseText && len(r.Rules) == 0 {
@@ -376,7 +378,10 @@ func (d *driver) processJSON(name string) bool {
 	text, ok := d.answer(name) // answered
 	line := d.jsonLine
 	if line == "" {
-		line = jsonStat(name, text, ok)
+		if d.o.safeText {
+			text = safeOutput(text)
+		}
+		line = jsonStat(d.o.jsonName(name), text, ok)
 	}
 	d.out(line)
 	d.outByte('\n')
@@ -384,6 +389,16 @@ func (d *driver) processJSON(name string) bool {
 		return d.flush() && ok
 	}
 	return ok && d.err == nil
+}
+
+// jsonName is the name a --json record carries: as it is, which JSON
+// quotes, or escaped under --safe-text. Standard input stays "-" here for
+// jsonStat and renderJSON to name.
+func (o options) jsonName(name string) string {
+	if o.safeText && name != "-" && name != "" {
+		return safeName(name)
+	}
+	return name
 }
 
 // jsonStat is the --json record of an answer the library did not give: the

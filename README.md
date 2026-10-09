@@ -17,7 +17,7 @@ The binary is called `softmagic`. It is built against the tagged library
 
 ```
 softmagic [-bEhikLnNprsS0] [--apple] [--extension] [--mime-encoding] [--mime-type]
-          [--json] [-F <separator>] [-m <magicdirs>] [--extra-magic <dirs>]
+          [--json] [--safe-text] [-F <separator>] [-m <magicdirs>] [--extra-magic <dirs>]
           [--max-bytes <n>] [-P <name>=<value>] [-e <check>] [--exclude-quiet <check>]
           [-f <namefile>] <file> ...
 softmagic [-m <magicdirs>] -l
@@ -40,6 +40,7 @@ the `-f` stands: options after the first `-f` change only what is printed (`-b`,
 | `--mime-type`, `--mime-encoding` | one half of `-i` |
 | `--extension` | the rule's extension list, `???` when none |
 | `--apple` | the rule's Apple creator/type, `UNKNUNKN` when none |
+| `--safe-text` | output safe to put into HTML, a log or a quoted value as it is: every byte taken from a file, a file name or a link target is written as `\xHH` unless it is printable ASCII other than `\ < > & " '` and the backquote, and the rest of the answer is printable ASCII too (the `-k` separator's newline is `\x0a`). It overrides `-r`. The answer is no longer `file`'s |
 | `--json` | one JSON object per line and nothing else: `name`, then the library's `result` (with the stat layer's words before it in `modes`), or the stat layer's own `answer` for a directory, device or link, or an `error` |
 | `-N` | no padding of the answers into a column |
 | `-n` | flush after every file; a `-f` list prints each name at its own width |
@@ -95,7 +96,10 @@ combinations with `-k`, `-b`, `-N`, `-0`, `-00`, `-F`, `-n`, `-r`, `-s`, `-L`, `
 Known differences:
 
 - `-m` and `--extra-magic` take source directories, not compiled `.mgc` files.
-- A name holding an East Asian wide character pads one column short of `file`.
+- Names and answers are printed as `file` prints them in a UTF-8 locale, whatever the locale:
+  which characters are escaped and how wide a name is come from glibc's `iswprint` and
+  `wcwidth` for `C.UTF-8`, taken into `cmd/softmagic/wctype.go` by `make wctype`. Under
+  `LC_ALL=C`, `file` escapes every byte outside ASCII instead.
 - `file`'s `-C`, `-d`, `-z` and `-Z` are not provided. `-c` reports a refused rule in the
   library's words, after the lines before it, where `file` warns and goes on. With several
   `-m` directories, `file -c` prefixes the second and later warnings with bytes read from freed
@@ -142,7 +146,9 @@ by side over the corpus and every path under `DIRS`, in 63 modes: default, `-b`,
 each output mode, and `-k -r -E` with and without `--mime-type` (the flags azul passes to
 libmagic); every `-e` name, alone and with `-i`, `-k` and `--extension`; and every `-P`
 parameter at a value that changes answers, including the three that stop with an error, alone
-and with the other modes. Each mode is a subtest, so `go test -run 'TestReference/-k'` selects
+and with the other modes. `TestReferenceNames` adds names outside ASCII (bidi controls,
+no-break and zero-width spaces, wide, combining and private-use characters, invalid bytes) in
+`C.UTF-8`. Each mode is a subtest, so `go test -run 'TestReference/-k'` selects
 some. It requires stdout, stderr and the exit code to be byte-identical, and lists every difference. Building the
 reference needs a C compiler and `make`. A host's own `file` is not a substitute: it is usually
 another release.
