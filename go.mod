@@ -1,4 +1,4 @@
-module github.com/eitanity/softmagic-cli
+module code.eitanity.com/softmagic-cli
 
 go 1.26.0
 

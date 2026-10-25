@@ -7,11 +7,16 @@ byte, for every mode the library implements, with the same exit codes.
 ## Install
 
 ```
-go install github.com/eitanity/softmagic-cli/cmd/softmagic@latest
+go install code.eitanity.com/softmagic-cli/cmd/softmagic@latest
 ```
 
 The binary is called `softmagic`. It is built against the tagged library
 `code.eitanity.com/softmagic`; `softmagic --version` names both versions.
+
+The module was renamed from `github.com/eitanity/softmagic-cli` to
+`code.eitanity.com/softmagic-cli` after v0.4.0. The repository is unchanged: the new path
+resolves to it. Releases up to v0.4.0 remain installable under the old path; later releases
+are published under the new path only.
 
 ## Usage
 
