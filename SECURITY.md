@@ -17,8 +17,12 @@ softmagic-cli is pre-1.0. Fixes go into the latest release only; there are no ba
 
 | Version | Supported |
 |---------|-----------|
-| 0.3.x (latest) | yes |
+| latest 0.4.x | yes |
 | older   | no        |
+
+From its first release after v0.4.0, softmagic-cli uses the library under its new module path,
+`code.eitanity.com/softmagic` (previously `github.com/eitanity/softmagic`). `softmagic --version`
+names the library version it was built with.
 
 ## What softmagic trusts
 
