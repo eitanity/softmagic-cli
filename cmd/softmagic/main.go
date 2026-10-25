@@ -12,9 +12,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/eitanity/softmagic"
-	"github.com/eitanity/softmagic/compile"
 	"os"
+
+	"code.eitanity.com/softmagic"
+	"code.eitanity.com/softmagic/compile"
 )
 
 func main() {

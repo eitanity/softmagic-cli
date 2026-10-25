@@ -14,7 +14,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/eitanity/softmagic"
+	"code.eitanity.com/softmagic"
 )
 
 // pipeBuf is PIPE_BUF: the reference stops reading a pipe at the first

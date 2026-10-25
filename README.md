@@ -11,7 +11,7 @@ go install github.com/eitanity/softmagic-cli/cmd/softmagic@latest
 ```
 
 The binary is called `softmagic`. It is built against the tagged library
-`github.com/eitanity/softmagic`; `softmagic --version` names both versions.
+`code.eitanity.com/softmagic`; `softmagic --version` names both versions.
 
 ## Usage
 
@@ -128,7 +128,7 @@ form has been checked against `file`.
 ## Verifying it yourself
 
 `make test` runs the CLI over the library's corpus (`testdata/corpus` of
-`github.com/eitanity/softmagic`, cloned beside this checkout as `../softmagic`; without it
+`code.eitanity.com/softmagic`, cloned beside this checkout as `../softmagic`; without it
 those tests skip), four modes per file against expectations produced by the reference, and over a
 temporary tree of special files whose expected answers were transcribed from the reference.
 

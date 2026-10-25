@@ -8,7 +8,7 @@ directory that triggers it (or how to build it), and the output of `softmagic --
 
 A problem in identification itself (a crash, a hang or a wrong answer for some bytes) belongs to
 the library: report it at
-[github.com/eitanity/softmagic](https://github.com/eitanity/softmagic/security). Its
+[code.eitanity.com/softmagic](https://github.com/eitanity/softmagic/security). Its
 `SECURITY.md` describes what the library trusts and how to use it on untrusted input.
 
 ## Supported versions

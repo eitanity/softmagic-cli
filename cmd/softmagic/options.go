@@ -7,11 +7,12 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/eitanity/softmagic"
 	"io"
 	"math"
 	"os"
 	"strings"
+
+	"code.eitanity.com/softmagic"
 )
 
 // outputMode is what each line reports, as file(1)'s flags select it.

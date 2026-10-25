@@ -10,8 +10,8 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/eitanity/softmagic"
-	"github.com/eitanity/softmagic/compile"
+	"code.eitanity.com/softmagic"
+	"code.eitanity.com/softmagic/compile"
 )
 
 // loadDatabase is file(1)'s magic selection: -m replaces the default
@@ -86,7 +86,7 @@ func buildVersions() (cli, lib string) {
 		cli = bi.Main.Version
 	}
 	for _, dep := range bi.Deps {
-		if dep.Path == "github.com/eitanity/softmagic" {
+		if dep.Path == "code.eitanity.com/softmagic" {
 			lib = dep.Version
 			if dep.Replace != nil {
 				lib += " => " + dep.Replace.Path + " " + dep.Replace.Version

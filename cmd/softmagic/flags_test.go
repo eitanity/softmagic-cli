@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eitanity/softmagic"
+	"code.eitanity.com/softmagic"
 )
 
 // TestParams: -P as file(1)'s setparam reads it. The name selects the first
