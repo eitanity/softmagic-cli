@@ -247,17 +247,25 @@ func (d *driver) fromFile(f *os.File, name, prefix string) (string, bool) { // f
 	}
 	if okstat && info.Mode().IsRegular() && name != "" {
 		r := d.db.IdentifyAt(context.Background(), f, info.Size(), opts)
+		if r.Examined.ReadError != nil {
+			return d.cannotRead(name, prefix, r.Examined.ReadError), false
+		}
 		return d.render(name, prefix, r), true
 	}
 	n, err := readOnce(f, d.buf) // bytesRead
 	if err != nil && !errors.Is(err, io.EOF) {
-		if name == "" {
-			name = "/dev/stdin"
-		}
-		return "ERROR: " + prefix + "cannot read `" + d.o.fsText(name) + "' (" + cerror(err) + ")", false
+		return d.cannotRead(name, prefix, err), false
 	}
 	r := d.db.IdentifyWith(context.Background(), d.buf[:n], opts)
 	return d.render(name, prefix, r), true
+}
+
+// cannotRead is file's error for an input whose read failed.
+func (d *driver) cannotRead(name, prefix string, err error) string {
+	if name == "" {
+		name = "/dev/stdin"
+	}
+	return "ERROR: " + prefix + "cannot read `" + d.o.fsText(name) + "' (" + cerror(err) + ")"
 }
 
 // readPipe is the reference's pipe loop: read until the buffer is full
