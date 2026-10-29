@@ -220,8 +220,10 @@ func (o *options) apply(ev optEvent) (string, bool) { // event
 			return err.Error(), true // file_err: the command ends here
 		}
 	case "max-bytes":
-		n, _ := atoi(ev.value)
-		o.maxBytes = n
+		// --max-bytes N is -P bytes=N, range check and message included.
+		if err := applyParams(o, []string{"bytes=" + ev.value}); err != nil {
+			return err.Error(), true
+		}
 	case "extra-magic":
 		o.extraDirs = ev.value
 	case "separator":

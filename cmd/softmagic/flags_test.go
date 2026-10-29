@@ -56,6 +56,30 @@ func TestParams(t *testing.T) {
 	}
 }
 
+// TestMaxBytesIsParam: --max-bytes N reads N exactly as -P bytes=N does,
+// with its range check and message: 3000000000 is out of bounds as the
+// int -1294967296, where it used to wrap silently to 0 bytes.
+func TestMaxBytesIsParam(t *testing.T) {
+	result := func(args ...string) string {
+		o, err := parseArgs(append(args, "x"))
+		if err != nil {
+			return "error " + err.Error()
+		}
+		return fmt.Sprintf("bytes %d", o.maxBytes)
+	}
+	for _, v := range []string{"5", "0", "-1", "abc", "3000000000", "4294967296", "999999999999999999999"} {
+		want := result("-P", "bytes="+v)
+		for _, args := range [][]string{{"--max-bytes", v}, {"--max-bytes=" + v}} {
+			if got := result(args...); got != want {
+				t.Errorf("%v: %s, want %s as -P bytes=%s", args, got, want, v)
+			}
+		}
+	}
+	if got := result("--max-bytes", "3000000000"); !strings.Contains(got, "Out of bounds value -1294967296 for bytes") {
+		t.Errorf("--max-bytes 3000000000: %s", got)
+	}
+}
+
 // TestExcludeFlags: -e takes file(1)'s names, an unknown one is a usage
 // error, and --exclude-quiet ignores what it does not know.
 func TestExcludeFlags(t *testing.T) {
