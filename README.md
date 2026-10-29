@@ -158,6 +158,16 @@ some. It requires stdout, stderr and the exit code to be byte-identical, and lis
 reference needs a C compiler and `make`. A host's own `file` is not a substitute: it is usually
 another release.
 
+`make differential` compares the two on generated inputs rather than files on disk. The library
+(`LIB`, by default `../softmagic`) writes out every case its fuzz targets have: their seeds,
+`testdata/fuzz` and the go command's fuzz cache, each as an input file and, for the targets
+that build their own rules, those rules as a `-m` directory. `softmagic`, built against that
+checkout through a `go.work` rather than the version `go.mod` requires, and the reference then
+run every case with `-b` and `-b -i`, and stdout, stderr and the exit code must be
+byte-identical. `.differential/differences.txt` lists the differences, the groups that look
+alike first, so that one cause shows as one group. A longer `make fuzz` in the library first
+gives it more cases.
+
 ## Licence
 
 BSD-2-Clause, Copyright (c) 2026 Eitanity Systems VCC; see `LICENSE`. The stat
